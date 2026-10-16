@@ -2,76 +2,129 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 )
 
 const (
-	minTemp = 15
-	maxTemp = 30
+	minTemp    = 15
+	maxTemp    = 30
+	noSolution = -1
 )
 
-func processDepartment(reader *bufio.Reader) bool {
-	var employees int
+type Operator string
 
-	_, err := fmt.Fscan(reader, &employees)
-	if err != nil {
-		fmt.Println("Invalid number of employees")
+const (
+	GreaterOrEqual Operator = ">="
+	LessOrEqual    Operator = "<="
+)
 
-		return false
-	}
+var errUnknownOperator = errors.New("unknown operator")
 
-	low, high := minTemp, maxTemp
-
-	for range employees {
-		var (
-			sign string
-			temp int
-		)
-
-		_, err = fmt.Fscan(reader, &sign, &temp)
-		if err != nil {
-			fmt.Println("Invalid temperature")
-
-			return false
-		}
-
-		switch sign {
-		case ">=":
-			low = max(low, temp)
-		case "<=":
-			high = min(high, temp)
-		default:
-			fmt.Println("Invalid operation")
-
-			return false
-		}
-
-		if low > high {
-			fmt.Println(-1)
-		} else {
-			fmt.Println(low)
-		}
-	}
-
-	return true
+type Temperature struct {
+	low  int
+	high int
 }
 
-func main() {
-	reader := bufio.NewReader(os.Stdin)
+func NewTemperature() *Temperature {
+	return &Temperature{
+		low:  minTemp,
+		high: maxTemp,
+	}
+}
 
-	var departments int
+func (t *Temperature) Update(operator Operator, value int) error {
+	switch operator {
+	case GreaterOrEqual:
+		t.low = max(t.low, value)
+	case LessOrEqual:
+		t.high = min(t.high, value)
+	default:
+		return fmt.Errorf("%w: %q", errUnknownOperator, operator)
+	}
 
-	_, err := fmt.Fscan(reader, &departments)
+	return nil
+}
+
+func (t *Temperature) Optimal() int {
+	if t.low > t.high {
+		return noSolution
+	}
+
+	return t.low
+}
+
+func readCount(reader *bufio.Reader) (int, error) {
+	var count int
+
+	_, err := fmt.Fscan(reader, &count)
 	if err != nil {
-		fmt.Println("Invalid number of departments")
+		return 0, fmt.Errorf("read count: %w", err)
+	}
 
-		return
+	return count, nil
+}
+
+func readCondition(reader *bufio.Reader) (Operator, int, error) {
+	var (
+		operator string
+		value    int
+	)
+
+	_, err := fmt.Fscan(reader, &operator, &value)
+	if err != nil {
+		return "", 0, fmt.Errorf("read condition: %w", err)
+	}
+
+	return Operator(operator), value, nil
+}
+
+func processDepartment(reader *bufio.Reader, employees int) error {
+	temperature := NewTemperature()
+
+	for range employees {
+		operator, value, err := readCondition(reader)
+		if err != nil {
+			return err
+		}
+
+		err = temperature.Update(operator, value)
+		if err != nil {
+			return fmt.Errorf("update temperature: %w", err)
+		}
+
+		fmt.Println(temperature.Optimal())
+	}
+
+	return nil
+}
+
+func run(reader *bufio.Reader) error {
+	departments, err := readCount(reader)
+	if err != nil {
+		return fmt.Errorf("departments: %w", err)
 	}
 
 	for range departments {
-		if !processDepartment(reader) {
-			return
+		employees, err := readCount(reader)
+		if err != nil {
+			return fmt.Errorf("employees: %w", err)
 		}
+
+		err = processDepartment(reader, employees)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func main() {
+	err := run(bufio.NewReader(os.Stdin))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 }
