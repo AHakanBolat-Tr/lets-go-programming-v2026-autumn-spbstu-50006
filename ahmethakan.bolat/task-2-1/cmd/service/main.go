@@ -4,72 +4,74 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-
-	"github.com/AHakanBolat-Tr/task-2-1/internal/temperature"
 )
 
-func main() {
-	err := run(bufio.NewReader(os.Stdin), bufio.NewWriter(os.Stdout))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-}
+const (
+	minTemp = 15
+	maxTemp = 30
+)
 
-func run(reader *bufio.Reader, writer *bufio.Writer) error {
-	var departments int
-
-	_, err := fmt.Fscan(reader, &departments)
-	if err != nil {
-		return fmt.Errorf("read number of departments: %w", err)
-	}
-
-	for range departments {
-		err = processDepartment(reader, writer)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = writer.Flush()
-	if err != nil {
-		return fmt.Errorf("flush output: %w", err)
-	}
-
-	return nil
-}
-
-func processDepartment(reader *bufio.Reader, writer *bufio.Writer) error {
+func processDepartment(reader *bufio.Reader) bool {
 	var employees int
 
 	_, err := fmt.Fscan(reader, &employees)
 	if err != nil {
-		return fmt.Errorf("read number of employees: %w", err)
+		fmt.Println("Invalid number of employees")
+
+		return false
 	}
 
-	allowed := temperature.NewRange()
+	low, high := minTemp, maxTemp
 
 	for range employees {
 		var (
-			operator string
-			value    int
+			sign string
+			temp int
 		)
 
-		_, err = fmt.Fscan(reader, &operator, &value)
+		_, err = fmt.Fscan(reader, &sign, &temp)
 		if err != nil {
-			return fmt.Errorf("read constraint: %w", err)
+			fmt.Println("Invalid temperature")
+
+			return false
 		}
 
-		err = allowed.Apply(operator, value)
-		if err != nil {
-			return fmt.Errorf("apply constraint: %w", err)
+		switch sign {
+		case ">=":
+			low = max(low, temp)
+		case "<=":
+			high = min(high, temp)
+		default:
+			fmt.Println("Invalid operation")
+
+			return false
 		}
 
-		_, err = fmt.Fprintln(writer, allowed.Optimal())
-		if err != nil {
-			return fmt.Errorf("write answer: %w", err)
+		if low > high {
+			fmt.Println(-1)
+		} else {
+			fmt.Println(low)
 		}
 	}
 
-	return nil
+	return true
+}
+
+func main() {
+	reader := bufio.NewReader(os.Stdin)
+
+	var departments int
+
+	_, err := fmt.Fscan(reader, &departments)
+	if err != nil {
+		fmt.Println("Invalid number of departments")
+
+		return
+	}
+
+	for range departments {
+		if !processDepartment(reader) {
+			return
+		}
+	}
 }
